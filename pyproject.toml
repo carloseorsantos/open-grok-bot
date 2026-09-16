@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open-grok-bot"
+version = "0.1.0"
+description = "Open-source, free AI teammate platform inspired by Grok Bot (x.ai/bot)"
+readme = "README.md"
+authors = [{ name = "Open Grok Bot Team" }]
+requires-python = ">=3.10"
+dependencies = [
+    "openai>=1.50.0",
+    "python-dotenv>=1.0.0",
+    "duckduckgo-search>=6.0.0",
+    "playwright>=1.45.0",
+    "rich>=13.7.0",
+    "python-telegram-bot>=21.0",
+    "pydantic>=2.7.0",
+]
+
+[project.scripts]
+open-grok-bot = "run:main"
