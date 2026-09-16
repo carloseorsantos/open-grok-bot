@@ -35,8 +35,9 @@ pip install -r requirements.txt
 
 # 4. Instalar Chromium e dependências de sistema do Playwright
 echo "🌐 Instalando Chromium do Playwright e bibliotecas Linux..."
-playwright install chromium
-sudo playwright install-deps chromium
+.venv/bin/playwright install chromium
+sudo .venv/bin/playwright install-deps chromium
+
 
 # 5. Garantir arquivo .env
 if [ ! -f .env ]; then
