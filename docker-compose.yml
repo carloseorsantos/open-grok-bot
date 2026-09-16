@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  open-grok-bot:
+    build: .
+    container_name: open-grok-bot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./workspace_output:/app/workspace_output
+      - ./screenshots:/app/screenshots
