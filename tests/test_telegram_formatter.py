@@ -43,3 +43,34 @@ def test_format_for_telegram_code_blocks():
     assert "<pre>" in formatted
     assert "def hello():" in formatted
     assert "</pre>" in formatted
+
+def test_format_headings_and_rules():
+    raw = (
+        "# Título Principal\n"
+        "### Subtítulo Três\n"
+        "---\n"
+        "Conteúdo normal."
+    )
+    formatted = format_for_telegram(raw)
+    assert "<b>📌 Título Principal</b>" in formatted
+    assert "<b>▪️ Subtítulo Três</b>" in formatted
+    assert "— — —" in formatted
+    assert "Conteúdo normal." in formatted
+
+
+def test_balance_html_tags():
+    from src.interfaces.telegram_bot import balance_html_tags
+    broken_html = "<b>Texto em negrito com <i>itálico sem fechar"
+    balanced = balance_html_tags(broken_html)
+    assert balanced.endswith("</i></b>") or balanced.endswith("</b></i>")
+
+
+def test_clean_text_fallback():
+    from src.interfaces.telegram_bot import clean_text_fallback
+    raw = "### Título\nVeja **este texto** e [link](https://exemplo.com)"
+    cleaned = clean_text_fallback(raw)
+    assert "###" not in cleaned
+    assert "**" not in cleaned
+    assert "📌 Título" in cleaned
+    assert "este texto" in cleaned
+    assert "link (https://exemplo.com)" in cleaned

@@ -28,3 +28,31 @@ def test_memory_store_operations(tmp_path):
     assert deleted == 2
     assert len(store.get_messages("session_1")) == 0
 
+
+def test_routine_store_operations(tmp_path):
+    db_file = tmp_path / "test_routines.db"
+    store = MemoryStore(db_path=db_file)
+
+    store.save_routine(
+        name="daily-crypto",
+        description="Monitora crypto",
+        prompt_template="Preço do BTC",
+        schedule_time="09:00",
+        timezone="America/Sao_Paulo",
+        chat_id="998877"
+    )
+
+    routine = store.get_routine("daily-crypto")
+    assert routine is not None
+    assert routine["name"] == "daily-crypto"
+    assert routine["schedule_time"] == "09:00"
+    assert routine["chat_id"] == "998877"
+    assert routine["last_run"] is None
+
+    store.update_routine_last_run("daily-crypto", "2026-09-16")
+    updated = store.get_routine("daily-crypto")
+    assert updated["last_run"] == "2026-09-16"
+
+    routines = store.list_routines()
+    assert len(routines) >= 1
+    assert any(r["name"] == "daily-crypto" for r in routines)

@@ -53,10 +53,25 @@ class MemoryStore:
                     description TEXT,
                     prompt_template TEXT NOT NULL,
                     schedule TEXT,
+                    schedule_time TEXT,
+                    timezone TEXT DEFAULT 'America/Sao_Paulo',
+                    chat_id TEXT,
+                    last_run TEXT,
                     enabled INTEGER DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # Migração suave para bancos existentes
+            existing_cols = [c[1] for c in cursor.execute("PRAGMA table_info(routines)").fetchall()]
+            if "schedule_time" not in existing_cols:
+                cursor.execute("ALTER TABLE routines ADD COLUMN schedule_time TEXT")
+            if "timezone" not in existing_cols:
+                cursor.execute("ALTER TABLE routines ADD COLUMN timezone TEXT DEFAULT 'America/Sao_Paulo'")
+            if "chat_id" not in existing_cols:
+                cursor.execute("ALTER TABLE routines ADD COLUMN chat_id TEXT")
+            if "last_run" not in existing_cols:
+                cursor.execute("ALTER TABLE routines ADD COLUMN last_run TEXT")
 
             # Histórico de aprovações (Human-in-the-loop)
             cursor.execute("""
@@ -150,17 +165,35 @@ class MemoryStore:
             return deleted
 
     # --- Rotinas ---
-    def save_routine(self, name: str, description: str, prompt_template: str, schedule: Optional[str] = None):
+    def save_routine(
+        self,
+        name: str,
+        description: str,
+        prompt_template: str,
+        schedule: Optional[str] = None,
+        schedule_time: Optional[str] = None,
+        timezone: str = "America/Sao_Paulo",
+        chat_id: Optional[str] = None
+    ):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO routines (name, description, prompt_template, schedule)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO routines (name, description, prompt_template, schedule, schedule_time, timezone, chat_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(name) DO UPDATE SET
                     description = excluded.description,
                     prompt_template = excluded.prompt_template,
-                    schedule = excluded.schedule
-            """, (name, description, prompt_template, schedule))
+                    schedule = excluded.schedule,
+                    schedule_time = excluded.schedule_time,
+                    timezone = excluded.timezone,
+                    chat_id = excluded.chat_id
+            """, (name, description, prompt_template, schedule, schedule_time, timezone, chat_id))
+            conn.commit()
+
+    def update_routine_last_run(self, name: str, last_run_date: str) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE routines SET last_run = ? WHERE name = ?", (last_run_date, name))
             conn.commit()
 
     def delete_routine(self, name: str) -> bool:
@@ -175,13 +208,13 @@ class MemoryStore:
     def list_routines(self) -> list[dict]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT name, description, prompt_template, schedule, enabled FROM routines")
+            cursor.execute("SELECT name, description, prompt_template, schedule, schedule_time, timezone, chat_id, last_run, enabled FROM routines")
             return [dict(r) for r in cursor.fetchall()]
 
     def get_routine(self, name: str) -> Optional[dict]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT name, description, prompt_template, schedule, enabled FROM routines WHERE name = ?", (name,))
+            cursor.execute("SELECT name, description, prompt_template, schedule, schedule_time, timezone, chat_id, last_run, enabled FROM routines WHERE name = ?", (name,))
             row = cursor.fetchone()
             return dict(row) if row else None
 

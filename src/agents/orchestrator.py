@@ -208,7 +208,8 @@ class ChiefOfStaff:
                         "properties": {
                             "name": {"type": "string", "description": "Identificador único da rotina (ex: bitcoin-monitor)"},
                             "description": {"type": "string", "description": "Breve descrição do que a rotina faz"},
-                            "prompt_template": {"type": "string", "description": "Instruções completas da tarefa com placeholders {var} se houver"}
+                            "prompt_template": {"type": "string", "description": "Instruções completas da tarefa com placeholders {var} se houver"},
+                            "schedule_time": {"type": "string", "description": "Horário diário de disparo no formato HH:MM (ex: '10:00' para 10h da manhã) se for agendada"}
                         },
                         "required": ["name", "description", "prompt_template"]
                     }
@@ -272,22 +273,28 @@ class ChiefOfStaff:
             system_prompt=(
                 "Você é o Chief of Staff do Open Grok Bot. Você lidera uma equipe de AI Teammates de alta performance. "
                 "Seu estilo é ágil, direto, espirituoso e altamente competente (estilo Grok).\n\n"
+                "REGRA ABSOLUTA DE RESPOSTA:\n"
+                "- Responda APENAS e DIRETAMENTE à última mensagem ou comando do usuário.\n"
+                "- NUNCA liste tarefas que o usuário já pediu antes, NUNCA faça recapitulação ou histórico da conversa e NUNCA repita pedidos antigos.\n"
+                "- NÃO gere listas genéricas do que você pode fazer, a menos que o usuário pergunte especificamente 'o que você pode fazer?'.\n"
+                "- Seja conciso, direto ao ponto e focado na solução imediata.\n\n"
                 "COMO VOCÊ TRABALHA:\n"
                 "1. Seja ultrarrápido: se o usuário perguntar cotações, use get_currency_quote imediatamente.\n"
                 "2. Se o usuário pedir para criar ou gerar imagem, use generate_image.\n"
                 "3. Se o usuário pedir cálculos matemáticos, análise de dados ou código Python, use run_python_code.\n"
-                "4. Se o usuário pedir para criar uma rotina ('ensinar o bot' / 'show a bot how it's done'), use create_routine.\n"
+                "4. Se o usuário pedir para criar uma rotina ou agendar tarefas automáticas (ex: 'me mande a cotação todo dia às 10h'), use create_routine especificando schedule_time (ex: '10:00').\n"
                 "5. Se o usuário perguntar fatos ou notícias recentes, use search_web ou search_news.\n"
                 "6. Responda diretamente ao usuário assim que receber os dados da ferramenta. Não faça buscas repetidas.\n\n"
                 "REGRAS DE FORMATAÇÃO VISUAL (OBRIGATÓRIO PARA TELAS DE CELULAR/TELEGRAM):\n"
                 "- NUNCA, SOB NENHUMA HIPÓTESE, CRIE TABELAS COM BARRAS (| ... | ... |). Em celulares e no Telegram, tabelas quebram e ficam ilegíveis!\n"
                 "- Sempre formate dados, comparações, listas e preços em CARTÕES ou TÓPICOS usando negrito, bullet points (•) e quebras de linha limpas.\n"
-                "- Use emojis temáticos como marcadores visuais (ex: 📍 para locais, 💰 para preços/aluguel, 📈 para alta, 📉 para baixa, ✅ para prós, ⚠️ para contras).\n"
+                "- Use títulos simples com emojis (ex: 📌 Título ou 🔹 Subtítulo) em vez de cabeçalhos markdown com hashtags (###).\n"
                 "- Mantenha a leitura visualmente limpa, leve e moderna."
             ),
             tools=self.tools,
             tools_schema=self.tools_schema
         )
+        self.current_chat_id = None
 
     def _ask_researcher(self, task: str) -> str:
         return self.researcher.run(task)
@@ -301,9 +308,18 @@ class ChiefOfStaff:
     def _ask_code_analyst(self, task: str) -> str:
         return self.code_analyst.run(task)
 
-    def _create_routine(self, name: str, description: str, prompt_template: str) -> str:
-        memory_store.save_routine(name, description, prompt_template)
-        return f"Rotina '{name}' criada e salva com sucesso!"
+    def _create_routine(self, name: str, description: str, prompt_template: str, schedule_time: str = None) -> str:
+        from src.routines.manager import routine_manager
+        clean_name = name.strip().lower().replace(" ", "-")
+        routine_manager.create_routine(
+            name=clean_name,
+            description=description,
+            prompt_template=prompt_template,
+            schedule_time=schedule_time,
+            chat_id=self.current_chat_id
+        )
+        time_info = f" agendada para às {schedule_time} (horário de Brasília)" if schedule_time else ""
+        return f"Rotina '{clean_name}' criada e salva com sucesso{time_info}!"
 
     def _delete_routine(self, name: str) -> str:
         success = memory_store.delete_routine(name)
@@ -317,7 +333,8 @@ class ChiefOfStaff:
             return "Nenhuma rotina cadastrada no momento."
         lines = ["Rotinas salvas:"]
         for r in routines:
-            lines.append(f"• {r['name']}: {r['description']}")
+            sched = f" [⏰ {r.get('schedule_time')}]" if r.get('schedule_time') else ""
+            lines.append(f"• {r['name']}{sched}: {r['description']}")
         return "\n".join(lines)
 
     def _save_memory(self, category: str, key: str, value: str) -> str:
@@ -340,6 +357,10 @@ class ChiefOfStaff:
         return "\n".join(lines)
 
     def run(self, user_request: str, session_id: str = "default") -> str:
+        if session_id.startswith("telegram_"):
+            self.current_chat_id = session_id.replace("telegram_", "")
+        else:
+            self.current_chat_id = None
         return self.agent.run(user_request, session_id=session_id)
 
 

@@ -26,6 +26,7 @@ from telegram.ext import (
 from src.config import settings
 from src.agents.orchestrator import chief_of_staff
 from src.routines.manager import routine_manager
+from src.routines.scheduler import routine_scheduler
 from src.memory.db import memory_store
 from src.tools.filesystem import list_workspace_files
 from src.tools.image import generate_image
@@ -40,7 +41,7 @@ logger = logging.getLogger("OpenGrokBot.Telegram")
 async def persistent_typing(bot, chat_id: int, action: str = ChatAction.TYPING, interval: float = 4.0):
     """
     Mantém o indicador de ação (digitando/gravando áudio) ativo continuamente.
-    O Telegram cancela o ChatAction após 5 segundos; este loop renova a cada 4s até a conclusão.
+    O Telegram descarta o ChatAction após 5 segundos; este loop renova a cada 4s até a conclusão.
     """
     stop_event = asyncio.Event()
 
@@ -107,7 +108,7 @@ def convert_tables_to_cards(text: str) -> str:
 def format_for_telegram(text: str) -> str:
     """
     Converte markdown comum em HTML seguro e compatível com a Telegram Bot API.
-    Processa blocos de código, inline code, negrito, itálico, links e citações (blockquote).
+    Processa títulos (#, ##, ###), blocos de código, inline code, negrito, itálico, links e blockquotes.
     """
     # 0. Converter tabelas markdown em cartões amigáveis para mobile
     text = convert_tables_to_cards(text)
@@ -136,26 +137,33 @@ def format_for_telegram(text: str) -> str:
 
     text = re.sub(r"\[([^\]]+)\]\((https?://[^\s\)]+)\)", _save_link, text)
 
-    # 4. Escapar caracteres HTML no restante do texto
+    # 4. Escapar caracteres HTML no texto
     text = html.escape(text)
 
-    # 5. Citações markdown (> citação, que foi escapado para &gt;) -> <blockquote>citação</blockquote>
+    # 5. Converter cabeçalhos markdown e divisórias após escape para tags <b> válidas
+    text = re.sub(r"^####\s+(.+)$", r"<b>• \1</b>", text, flags=re.MULTILINE)
+    text = re.sub(r"^###\s+(.+)$", r"<b>▪️ \1</b>", text, flags=re.MULTILINE)
+    text = re.sub(r"^##\s+(.+)$", r"<b>🔹 \1</b>", text, flags=re.MULTILINE)
+    text = re.sub(r"^#\s+(.+)$", r"<b>📌 \1</b>", text, flags=re.MULTILINE)
+    text = re.sub(r"^(?:---|\*\*\*|___)\s*$", "— — —", text, flags=re.MULTILINE)
+
+    # 6. Citações markdown (> citação, que virou &gt;) -> <blockquote>citação</blockquote>
     text = re.sub(r"^&gt;\s*(.+)$", r"<blockquote>\1</blockquote>", text, flags=re.MULTILINE)
 
-    # 6. Negrito **...** -> <b>...</b>
+    # 7. Negrito **...** -> <b>...</b>
     text = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", text)
 
-    # 7. Itálico *...* ou _..._ -> <i>...</i>
+    # 8. Itálico *...* ou _..._ -> <i>...</i>
     text = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<i>\1</i>", text)
     text = re.sub(r"(?<![a-zA-Z0-9_])_([^_]+)_(?![a-zA-Z0-9_])", r"<i>\1</i>", text)
 
-    # 8. Restaurar links com tags HTML válidas
+    # 9. Restaurar links com tags HTML válidas
     for i, (l_text, l_url) in enumerate(links):
         safe_l_text = html.escape(l_text)
         safe_l_url = html.escape(l_url)
         text = text.replace(f"§§§LINK{i}§§§", f'<a href="{safe_l_url}">{safe_l_text}</a>')
 
-    # 9. Restaurar código inline e blocos de código escapados
+    # 10. Restaurar código inline e blocos de código escapados
     for i, code in enumerate(inline_codes):
         text = text.replace(f"§§§INLINECODE{i}§§§", f"<code>{html.escape(code)}</code>")
 
@@ -163,6 +171,50 @@ def format_for_telegram(text: str) -> str:
         text = text.replace(f"§§§CODEBLOCK{i}§§§", f"<pre>{html.escape(block)}</pre>")
 
     return text
+
+
+def balance_html_tags(text: str) -> str:
+    """
+    Garante que todas as tags HTML suportadas pelo Telegram que foram abertas
+    sejam devidamente fechadas no final da string, evitando erros de parse entities.
+    """
+    supported_tags = ["b", "strong", "i", "em", "code", "pre", "blockquote", "s", "u", "a"]
+    tag_pattern = re.compile(r"<\s*(/)?\s*([a-zA-Z0-9_-]+)(?:\s+[^>]*)?>")
+    stack = []
+
+    for match in tag_pattern.finditer(text):
+        is_closing, tag_name = match.group(1), match.group(2).lower()
+        if tag_name not in supported_tags:
+            continue
+        if not is_closing:
+            stack.append(tag_name)
+        else:
+            if stack and stack[-1] == tag_name:
+                stack.pop()
+            elif tag_name in stack:
+                while stack and stack[-1] != tag_name:
+                    stack.pop()
+                if stack:
+                    stack.pop()
+
+    # Fecha as tags restantes na ordem inversa
+    for tag in reversed(stack):
+        text += f"</{tag}>"
+
+    return text
+
+
+def clean_text_fallback(text: str) -> str:
+    """
+    Remove tags HTML e converte markdown em texto limpo com emojis para fallback elegante,
+    garantindo que o usuário nunca veja markdown cru (.md quebrado com asteriscos).
+    """
+    clean = re.sub(r"<[^>]+>", "", text)
+    clean = re.sub(r"^#{1,6}\s*(.+)$", r"📌 \1", clean, flags=re.MULTILINE)
+    clean = re.sub(r"\*\*([^*]+)\*\*", r"\1", clean)
+    clean = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"\1", clean)
+    clean = re.sub(r"\[([^\]]+)\]\((https?://[^\s\)]+)\)", r"\1 (\2)", clean)
+    return clean.strip()
 
 
 def get_quick_actions_keyboard() -> InlineKeyboardMarkup:
@@ -180,10 +232,23 @@ def get_quick_actions_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-async def send_clean_reply(update: Update, text: str, reply_markup: Optional[InlineKeyboardMarkup] = None):
-    """Envia mensagem formatada em HTML com suporte a split em chunks e fallback para texto simples."""
-    msg_target = update.message or (update.callback_query.message if update.callback_query else None)
-    if not msg_target:
+async def send_clean_reply(
+    update: Optional[Update] = None,
+    text: str = "",
+    reply_markup: Optional[InlineKeyboardMarkup] = None,
+    bot_instance=None,
+    chat_id: Optional[int] = None
+):
+    """
+    Envia mensagem formatada em HTML com suporte a chunks, auto-fechamento de tags,
+    e fallback elegante que nunca exibe markdown cru.
+    """
+    msg_target = None
+    if update:
+        msg_target = update.message or (update.callback_query.message if update.callback_query else None)
+
+    if not msg_target and not (bot_instance and chat_id):
+        logger.warning("send_clean_reply chamado sem destinatário válido.")
         return
 
     # Quebrar mensagens muito longas em blocos de até 3800 caracteres
@@ -200,14 +265,30 @@ async def send_clean_reply(update: Update, text: str, reply_markup: Optional[Inl
 
     total_chunks = len(chunks)
     for idx, chunk in enumerate(chunks):
-        html_chunk = format_for_telegram(chunk)
-        # Anexa o teclado de ações apenas no último bloco
+        html_chunk = balance_html_tags(format_for_telegram(chunk))
         current_markup = reply_markup if (idx == total_chunks - 1) else None
+
         try:
-            await msg_target.reply_html(html_chunk, reply_markup=current_markup, disable_web_page_preview=True)
+            if msg_target:
+                await msg_target.reply_html(html_chunk, reply_markup=current_markup, disable_web_page_preview=True)
+            else:
+                await bot_instance.send_message(
+                    chat_id=chat_id,
+                    text=html_chunk,
+                    parse_mode="HTML",
+                    reply_markup=current_markup,
+                    disable_web_page_preview=True
+                )
         except Exception as e:
-            logger.warning(f"Erro ao enviar mensagem em HTML ({e}), fallback para texto simples.")
-            await msg_target.reply_text(chunk, reply_markup=current_markup)
+            logger.warning(f"Erro ao enviar mensagem em HTML ({e}), usando fallback limpo sem .md cru.")
+            fallback_text = clean_text_fallback(chunk)
+            try:
+                if msg_target:
+                    await msg_target.reply_text(fallback_text, reply_markup=current_markup)
+                else:
+                    await bot_instance.send_message(chat_id=chat_id, text=fallback_text, reply_markup=current_markup)
+            except Exception as err:
+                logger.error(f"Falha definitiva ao enviar mensagem: {err}")
 
 
 def is_authorized(user_id: int) -> bool:
@@ -233,8 +314,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• <code>/memory</code> — Ver memórias compartilhadas\n"
         "• <code>/files</code> — Ver arquivos no workspace\n"
         "• <code>/reset</code> — Limpar histórico da conversa\n\n"
-        "🎙️ <b>Novidade:</b> Você pode me enviar <b>mensagens de áudio/voz</b> diretamente!\n"
-        "💡 <i>Ou digite qualquer tarefa, cálculo ou pergunta em linguagem natural.</i>"
+        "⏰ <b>Automações Agendadas:</b> Peça <i>'me envie a cotação do euro todo dia às 10h'</i> e o bot enviará pontualmente!\n"
+        "🎙️ <b>Voz:</b> Envie notas de voz e o bot responde diretamente!\n"
+        "💡 <i>Ou digite qualquer pergunta ou tarefa em linguagem natural.</i>"
     )
     await update.message.reply_html(msg, reply_markup=get_quick_actions_keyboard())
 
@@ -253,13 +335,16 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     limit_tokens = limits.get("limit_tokens", "8000")
     reset_sec = limits.get("reset_tokens", 0)
 
+    sched_routines = [r for r in routines if r.get("schedule_time")]
+
     msg = (
         "⚡ <b>Open Grok Bot — Status do Sistema</b>\n\n"
         f"🤖 <b>Modelo Principal:</b> <code>{settings.GROQ_MODEL}</code>\n"
-        f"🎙️ <b>Voz & Transcrição:</b> <code>{settings.GROQ_WHISPER_MODEL} (Groq)</code>\n"
+        f"🎙️ <b>Voz & Transcrição:</b> <code>{settings.GROQ_WHISPER_MODEL}</code>\n"
         f"🎨 <b>Gerador de Imagens:</b> <code>Flux.1 (Pollinations)</code>\n"
+        f"⏰ <b>Agendador em Background:</b> <code>Ativo ({len(sched_routines)} rotinas agendadas)</code>\n"
         f"🧠 <b>Memórias Salvas:</b> {len(mems)}\n"
-        f"📋 <b>Rotinas Ativas:</b> {len(routines)}\n"
+        f"📋 <b>Rotinas Totais:</b> {len(routines)}\n"
         f"📂 <b>Arquivos no Workspace:</b> {len(workspace_files)}\n\n"
         "📊 <b>Quota Groq (Rate Limit):</b>\n"
         f"• Tokens restantes: <code>{rem_tokens} / {limit_tokens} TPM</code>\n"
@@ -313,10 +398,11 @@ async def routines_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
 
     if not routines:
-        lines.append("<i>Nenhuma rotina salva ainda. Crie uma dizendo 'ensine o bot a...'</i>")
+        lines.append("<i>Nenhuma rotina salva ainda. Diga 'me envie a cotação do euro todo dia às 10h' para criar!</i>")
     else:
         for r in routines:
-            lines.append(f"• <b>{r['name']}</b>: {r['description']}")
+            sched = f" [⏰ {r.get('schedule_time')}]" if r.get('schedule_time') else ""
+            lines.append(f"• <b>{r['name']}</b>{sched}: {r['description']}")
             keyboard.append([
                 InlineKeyboardButton(f"▶️ Executar {r['name']}", callback_data=f"run_routine:{r['name']}")
             ])
@@ -599,7 +685,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def post_init_setup(application):
-    """Registra comandos nativos no menu do Telegram ao inicializar."""
+    """Registra comandos nativos no menu do Telegram e inicia o agendador de rotinas."""
     commands = [
         BotCommand("start", "Menu principal e visão geral"),
         BotCommand("imagine", "Gerar imagem com Flux.1"),
@@ -616,6 +702,12 @@ async def post_init_setup(application):
         logger.info("✅ Menu de comandos nativo registrado com sucesso no Telegram.")
     except Exception as e:
         logger.warning(f"Não foi possível registrar set_my_commands: {e}")
+
+    # Iniciar motor de agendamento de rotinas com a instância do bot
+    try:
+        await routine_scheduler.start(bot=application.bot)
+    except Exception as e:
+        logger.error(f"Erro ao iniciar motor de agendamento de rotinas: {e}")
 
 
 def run_telegram_bot():

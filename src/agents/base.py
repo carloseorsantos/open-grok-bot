@@ -133,8 +133,9 @@ class Agent:
                 "role": "user",
                 "content": (
                     "Com base nas informações coletadas acima pelas ferramentas, elabore a resposta final completa, clara e direta para o usuário agora.\n"
+                    "REGRA FUNDAMENTAL: Responda APENAS e DIRETAMENTE ao que foi pedido nesta mensagem. NUNCA liste pedidos anteriores, não recapitule o histórico e não faça resumos de tarefas passadas.\n"
                     "REGRA DE FORMATAÇÃO: NUNCA use tabelas com barras (|). "
-                    "Formate a resposta em tópicos, cartões e bullet points (•) usando negrito e emojis, perfeitamente legível no celular."
+                    "Formate em tópicos destacados com emojis (ex: 📌, 🔹, •) usando negrito, perfeitamente legível no celular."
                 )
             })
 

@@ -33,10 +33,20 @@ class RoutineManager:
             if not memory_store.get_routine(d["name"]):
                 memory_store.save_routine(d["name"], d["description"], d["prompt_template"])
 
-    def create_routine(self, name: str, description: str, prompt_template: str, schedule: Optional[str] = None):
-        """Salva uma nova rotina no banco de dados."""
-        memory_store.save_routine(name, description, prompt_template, schedule)
-        return f"Rotina '{name}' salva com sucesso!"
+    def create_routine(
+        self,
+        name: str,
+        description: str,
+        prompt_template: str,
+        schedule: Optional[str] = None,
+        schedule_time: Optional[str] = None,
+        timezone: str = "America/Sao_Paulo",
+        chat_id: Optional[str] = None
+    ):
+        """Salva uma nova rotina no banco de dados com suporte a agendamento de horário e destinatário."""
+        memory_store.save_routine(name, description, prompt_template, schedule, schedule_time, timezone, chat_id)
+        time_info = f" às {schedule_time} ({timezone})" if schedule_time else ""
+        return f"Rotina '{name}' salva com sucesso{time_info}!"
 
     def delete_routine(self, name: str) -> str:
         """Remove uma rotina do banco de dados."""
