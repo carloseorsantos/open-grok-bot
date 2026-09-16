@@ -1,5 +1,7 @@
 import asyncio
+import html
 import logging
+import re
 from pathlib import Path
 from telegram import Update
 from telegram.ext import (
@@ -17,6 +19,52 @@ from src.tools.filesystem import list_workspace_files
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger("OpenGrokBot.Telegram")
+
+
+def format_for_telegram(text: str) -> str:
+    """
+    Converte markdown comum do LLM em HTML seguro e compatível com o Telegram.
+    Transforma **negrito**, *itálico*, `código` e ```blocos``` em tags HTML.
+    """
+    # 1. Escapar caracteres HTML básicos
+    text = html.escape(text)
+
+    # 2. Blocos de código ```...``` -> <pre>...</pre>
+    text = re.sub(r"```([a-zA-Z0-9_-]*)\n?(.*?)```", r"<pre>\2</pre>", text, flags=re.DOTALL)
+
+    # 3. Código inline `...` -> <code>...</code>
+    text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
+
+    # 4. Negrito **...** -> <b>...</b>
+    text = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", text)
+
+    # 5. Itálico *...* ou _..._ -> <i>...</i>
+    text = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<i>\1</i>", text)
+    text = re.sub(r"(?<!_)_([^_]+)_(?!_)", r"<i>\1</i>", text)
+
+    return text
+
+
+async def send_clean_reply(update: Update, text: str):
+    """Envia a mensagem formatada em HTML com fallback para texto simples."""
+    # Quebrar mensagens muito longas em blocos de até 3900 caracteres
+    chunks = []
+    while len(text) > 3900:
+        split_idx = text.rfind("\n", 0, 3900)
+        if split_idx == -1:
+            split_idx = 3900
+        chunks.append(text[:split_idx])
+        text = text[split_idx:].strip()
+    if text:
+        chunks.append(text)
+
+    for chunk in chunks:
+        html_chunk = format_for_telegram(chunk)
+        try:
+            await update.message.reply_html(html_chunk)
+        except Exception as e:
+            logger.warning(f"Erro ao enviar mensagem em HTML ({e}), enviando como texto simples.")
+            await update.message.reply_text(chunk)
 
 
 def is_authorized(user_id: int) -> bool:
@@ -64,7 +112,7 @@ async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     routine_name = context.args[0]
     await update.message.reply_text(f"⏳ Executando rotina '{routine_name}'...")
     result = await asyncio.to_thread(routine_manager.run_routine, routine_name)
-    await update.message.reply_text(result[:4000])
+    await send_clean_reply(update, result)
 
 
 async def memory_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -110,8 +158,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             with open(latest, "rb") as photo:
                 await update.message.reply_photo(photo=photo, caption="📸 Captura de tela realizada durante a tarefa.")
 
-    # Envia resposta de texto
-    await update.message.reply_text(response[:4000])
+    # Envia resposta de texto formatada
+    await send_clean_reply(update, response)
 
 
 def run_telegram_bot():
