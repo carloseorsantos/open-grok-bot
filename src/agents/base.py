@@ -51,12 +51,17 @@ class Agent:
 
         full_system_prompt = self.system_prompt + mem_text
 
-        # 2. Carrega histórico recente da sessão (multi-turn conversation)
+        # 2. Carrega histórico recente da sessão com controle de tamanho para economizar tokens
         history = memory_store.get_messages(session_id=session_id, limit=6)
         messages = [{"role": "system", "content": full_system_prompt}]
         for h in history:
-            if h.get("role") in ("user", "assistant") and h.get("content"):
-                messages.append({"role": h["role"], "content": h["content"]})
+            role = h.get("role")
+            content = h.get("content", "")
+            if role in ("user", "assistant") and content:
+                # Limita o tamanho de mensagens antigas para não estourar o limite de tokens por minuto (TPM)
+                if len(content) > 600:
+                    content = content[:550] + "... [contexto truncado para economia de tokens]"
+                messages.append({"role": role, "content": content})
 
         # Registra a mensagem atual do usuário
         messages.append({"role": "user", "content": task})

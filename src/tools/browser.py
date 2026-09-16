@@ -43,8 +43,8 @@ class BrowserController:
         except Exception as e:
             return f"Erro ao navegar para {url}: {str(e)}"
 
-    def get_content(self, max_length: int = 4000) -> str:
-        """Extrai o texto legível e os elementos clicáveis principais da página atual."""
+    def get_content(self, max_length: int = 2000) -> str:
+        """Extrai o texto legível e os elementos clicáveis principais da página atual (otimizado para tokens)."""
         try:
             self._ensure_browser()
             if not self._page or not self._page.url:
@@ -54,10 +54,10 @@ class BrowserController:
             text = self._page.inner_text("body")
             clean_text = re.sub(r"\n\s*\n", "\n\n", text).strip()
             
-            # Extrair links e botões clicáveis
+            # Extrair links e botões clicáveis principais
             elements = self._page.query_selector_all("a, button, input[type='submit']")
             interactive = []
-            for el in elements[:20]: # limita para não estourar contexto
+            for el in elements[:12]:
                 try:
                     el_text = el.inner_text().strip()
                     if el_text:
@@ -67,7 +67,7 @@ class BrowserController:
 
             summary = f"URL Atual: {self._page.url}\nTítulo: {self._page.title()}\n\n"
             if interactive:
-                summary += "Elementos interativos encontrados:\n" + "\n".join(interactive[:15]) + "\n\n"
+                summary += "Elementos interativos:\n" + "\n".join(interactive[:8]) + "\n\n"
             summary += "Conteúdo da página:\n" + clean_text[:max_length]
             return summary
         except Exception as e:

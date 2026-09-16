@@ -19,13 +19,18 @@ def test_groq_fallback_resilience(monkeypatch):
     mock_response.choices = [mock_choice]
 
     call_count = 0
+    mock_raw = MagicMock()
+    mock_raw.parse.return_value = mock_response
+    mock_raw.headers = {"x-ratelimit-remaining-tokens": "7000", "x-ratelimit-reset-tokens": "1.0s"}
+
     def mock_create(**kwargs):
         nonlocal call_count
         call_count += 1
         if kwargs.get("model") == "openai/gpt-oss-120b":
             raise Exception("Rate limit reached: 429 Too Many Requests")
-        return mock_response
+        return mock_raw
 
+    mock_client.chat.completions.with_raw_response.create = mock_create
     mock_client.chat.completions.create = mock_create
     client.client = mock_client
 

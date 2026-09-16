@@ -4,20 +4,23 @@ except ImportError:
     from duckduckgo_search import DDGS
 
 
-def search_web(query: str, max_results: int = 5) -> str:
+def search_web(query: str, max_results: int = 3) -> str:
     """
     Pesquisa na web em tempo real usando DuckDuckGo (100% gratuito e sem chave de API).
-    Retorna título, link e resumo dos principais resultados.
+    Retorna título, link e resumo dos principais resultados otimizados para economia de tokens.
     """
     try:
         results = []
         with DDGS() as ddgs:
             raw_results = ddgs.text(query, max_results=max_results)
             for r in raw_results:
+                body = (r.get("body") or "").strip()
+                if len(body) > 220:
+                    body = body[:220] + "..."
                 results.append({
                     "title": r.get("title"),
                     "url": r.get("href"),
-                    "snippet": r.get("body")
+                    "snippet": body
                 })
         
         if not results:
@@ -31,20 +34,23 @@ def search_web(query: str, max_results: int = 5) -> str:
         return f"Erro ao realizar busca na web: {str(e)}"
 
 
-def search_news(query: str, max_results: int = 5) -> str:
+def search_news(query: str, max_results: int = 3) -> str:
     """
-    Pesquisa notícias recentes na web em tempo real usando DuckDuckGo.
+    Pesquisa notícias recentes na web em tempo real usando DuckDuckGo (otimizado para tokens).
     """
     try:
         results = []
         with DDGS() as ddgs:
             raw_results = ddgs.news(query, max_results=max_results)
             for r in raw_results:
+                body = (r.get("body") or "").strip()
+                if len(body) > 220:
+                    body = body[:220] + "..."
                 results.append({
                     "title": r.get("title"),
                     "url": r.get("url"),
                     "date": r.get("date"),
-                    "snippet": r.get("body")
+                    "snippet": body
                 })
         
         if not results:
