@@ -39,30 +39,44 @@ class Agent:
 
     def run(self, task: str, session_id: str = "default", max_steps: int = 2) -> str:
         """
-        Executa o loop autônomo de raciocínio e ação com garantia de conclusão rápida.
+        Executa o loop autônomo de raciocínio e ação com contexto de memória e histórico.
         """
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": f"Tarefa a ser realizada: {task}"}
-        ]
+        # 1. Injeta memórias aprendidas no system prompt
+        shared_mems = memory_store.list_memories()
+        mem_text = ""
+        if shared_mems:
+            mem_text = "\n\n🧠 MEMÓRIAS E REGRAS COMPARTILHADAS (Use como contexto):\n"
+            for m in shared_mems[:8]:
+                mem_text += f"• [{m['category']}] {m['key']}: {m['value']}\n"
+
+        full_system_prompt = self.system_prompt + mem_text
+
+        # 2. Carrega histórico recente da sessão (multi-turn conversation)
+        history = memory_store.get_messages(session_id=session_id, limit=6)
+        messages = [{"role": "system", "content": full_system_prompt}]
+        for h in history:
+            if h.get("role") in ("user", "assistant") and h.get("content"):
+                messages.append({"role": h["role"], "content": h["content"]})
+
+        # Registra a mensagem atual do usuário
+        messages.append({"role": "user", "content": task})
+        memory_store.add_message(session_id=session_id, role="user", content=task)
 
         step = 0
         final_response = ""
 
         while step < max_steps:
             step += 1
-            # Na última iteração do loop, não passamos tools para forçar o modelo a sintetizar a resposta
-            allow_tools = (step < max_steps) and bool(self.tools_schema)
 
             response = llm_client.chat_completion(
                 messages=messages,
-                tools=self.tools_schema if allow_tools else None
+                tools=self.tools_schema if self.tools_schema else None
             )
 
             content = response.get("content", "")
             tool_calls = response.get("tool_calls")
 
-            # Se não houver chamadas de ferramenta, o bot concluiu a resposta
+            # Se não houver chamadas de ferramenta, o bot concluiu a resposta textual
             if not tool_calls:
                 final_response = content
                 break
@@ -98,7 +112,7 @@ class Agent:
                     "content": str(tool_output)
                 })
 
-            # Adiciona diretiva para consolidar a resposta sem loops
+            # Instrução direta para sintetizar a resposta com os dados coletados
             messages.append({
                 "role": "user",
                 "content": (
@@ -109,8 +123,8 @@ class Agent:
             })
 
         if not final_response:
-            # Fallback garantido: força geração direta de texto sem tools
-            fallback_resp = llm_client.chat_completion(messages=messages, tools=None)
+            # Fallback seguro caso o loop tenha atingido max_steps
+            fallback_resp = llm_client.chat_completion(messages=messages, tools=self.tools_schema if self.tools_schema else None)
             final_response = fallback_resp.get("content") or "Aqui estão as informações obtidas pelas ferramentas."
 
         # Salvar histórico no banco

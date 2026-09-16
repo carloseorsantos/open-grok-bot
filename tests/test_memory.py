@@ -22,3 +22,9 @@ def test_memory_store_operations(tmp_path):
     assert len(history) == 2
     assert history[0]["content"] == "Hello bot"
     assert history[1]["agent_name"] == "Chief of Staff"
+
+    # Test clear session
+    deleted = store.clear_session("session_1")
+    assert deleted == 2
+    assert len(store.get_messages("session_1")) == 0
+

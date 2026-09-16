@@ -17,3 +17,10 @@ def test_routine_manager(tmp_path, monkeypatch):
     routines = mgr.list_routines()
     names = [r["name"] for r in routines]
     assert "custom-check" in names
+
+    # Test delete routine
+    del_msg = mgr.delete_routine("custom-check")
+    assert "sucesso" in del_msg
+    routines_after = mgr.list_routines()
+    assert "custom-check" not in [r["name"] for r in routines_after]
+

@@ -2,6 +2,7 @@ from src.agents.base import Agent
 from src.tools.search import search_web, search_news
 from src.tools.filesystem import write_file, read_file, list_workspace_files
 from src.tools.browser import browser_controller
+from src.tools.code_runner import run_python_code
 
 
 def create_researcher_bot() -> Agent:
@@ -201,3 +202,68 @@ def create_outbound_bot() -> Agent:
         tools=tools,
         tools_schema=tools_schema
     )
+
+
+def create_code_analyst_bot() -> Agent:
+    tools = {
+        "run_python_code": run_python_code,
+        "write_file": write_file,
+        "read_file": read_file,
+        "list_workspace_files": list_workspace_files,
+    }
+    tools_schema = [
+        {
+            "type": "function",
+            "function": {
+                "name": "run_python_code",
+                "description": "Executa código Python no ambiente para cálculos, análises de dados, processamento de texto ou criação de scripts.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "code": {"type": "string", "description": "Código Python válido a ser executado"}
+                    },
+                    "required": ["code"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "write_file",
+                "description": "Salva um arquivo de código, dados ou relatório no workspace.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {"type": "string", "description": "Nome do arquivo (ex: script.py, dados.csv)"},
+                        "content": {"type": "string", "description": "Conteúdo a ser gravado"}
+                    },
+                    "required": ["filename", "content"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "read_file",
+                "description": "Lê o conteúdo de um arquivo do workspace.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {"type": "string", "description": "Nome do arquivo"}
+                    },
+                    "required": ["filename"]
+                }
+            }
+        }
+    ]
+    return Agent(
+        name="Code & Data Analyst",
+        role="Especialista em Programação e Análise de Dados",
+        system_prompt=(
+            "Você é o Code & Data Analyst Bot do time Open Grok Bot. Você resolve problemas de matemática, lógica, "
+            "ciência de dados e programação executando scripts Python reais e verificando a saída."
+        ),
+        tools=tools,
+        tools_schema=tools_schema
+    )
+

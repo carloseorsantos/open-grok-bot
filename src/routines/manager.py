@@ -38,6 +38,13 @@ class RoutineManager:
         memory_store.save_routine(name, description, prompt_template, schedule)
         return f"Rotina '{name}' salva com sucesso!"
 
+    def delete_routine(self, name: str) -> str:
+        """Remove uma rotina do banco de dados."""
+        success = memory_store.delete_routine(name)
+        if success:
+            return f"Rotina '{name}' removida com sucesso!"
+        return f"Rotina '{name}' não encontrada."
+
     def list_routines(self) -> List[Dict[str, Any]]:
         """Retorna todas as rotinas salvas."""
         return memory_store.list_routines()

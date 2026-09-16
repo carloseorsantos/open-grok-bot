@@ -76,38 +76,51 @@ class LLMClient:
                 "tool_calls": None
             }
 
-        try:
-            kwargs = {
-                "model": self.model,
-                "messages": messages,
-                "temperature": temperature,
-            }
-            if tools:
-                kwargs["tools"] = tools
-                kwargs["tool_choice"] = "auto"
+        # Lista de modelos a tentar em ordem
+        candidate_models = [self.model]
+        if self.provider == "groq":
+            fallback_models = ["openai/gpt-oss-20b", "groq/compound-mini", "groq/compound"]
+            for fm in fallback_models:
+                if fm not in candidate_models:
+                    candidate_models.append(fm)
 
-            response = self.client.chat.completions.create(**kwargs)
-            message = response.choices[0].message
+        last_error = ""
+        for current_model in candidate_models:
+            try:
+                kwargs = {
+                    "model": current_model,
+                    "messages": messages,
+                    "temperature": temperature,
+                }
+                if tools:
+                    kwargs["tools"] = tools
+                    kwargs["tool_choice"] = "auto"
 
-            parsed_tool_calls = []
-            if message.tool_calls:
-                for tc in message.tool_calls:
-                    parsed_tool_calls.append({
-                        "id": tc.id,
-                        "name": tc.function.name,
-                        "arguments": json.loads(tc.function.arguments) if tc.function.arguments else {}
-                    })
+                response = self.client.chat.completions.create(**kwargs)
+                message = response.choices[0].message
 
-            return {
-                "content": message.content or "",
-                "tool_calls": parsed_tool_calls if parsed_tool_calls else None,
-                "raw_message": message
-            }
-        except Exception as e:
-            return {
-                "content": f"Erro na chamada do modelo ({self.provider}/{self.model}): {str(e)}",
-                "tool_calls": None
-            }
+                parsed_tool_calls = []
+                if message.tool_calls:
+                    for tc in message.tool_calls:
+                        parsed_tool_calls.append({
+                            "id": tc.id,
+                            "name": tc.function.name,
+                            "arguments": json.loads(tc.function.arguments) if tc.function.arguments else {}
+                        })
+
+                return {
+                    "content": message.content or "",
+                    "tool_calls": parsed_tool_calls if parsed_tool_calls else None,
+                    "raw_message": message
+                }
+            except Exception as e:
+                last_error = str(e)
+                logger.warning(f"Erro com o modelo {current_model}: {last_error}. Tentando fallback...")
+
+        return {
+            "content": f"Erro na chamada do modelo ({self.provider}/{self.model}): {last_error}",
+            "tool_calls": None
+        }
 
 
 llm_client = LLMClient()

@@ -140,6 +140,15 @@ class MemoryStore:
             rows = cursor.fetchall()
             return [dict(r) for r in reversed(rows)]
 
+    def clear_session(self, session_id: str) -> int:
+        """Limpa o histórico de conversas de uma sessão específica."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+            deleted = cursor.rowcount
+            conn.commit()
+            return deleted
+
     # --- Rotinas ---
     def save_routine(self, name: str, description: str, prompt_template: str, schedule: Optional[str] = None):
         with self._get_connection() as conn:
@@ -153,6 +162,15 @@ class MemoryStore:
                     schedule = excluded.schedule
             """, (name, description, prompt_template, schedule))
             conn.commit()
+
+    def delete_routine(self, name: str) -> bool:
+        """Remove uma rotina pelo nome."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM routines WHERE name = ?", (name,))
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            return deleted
 
     def list_routines(self) -> list[dict]:
         with self._get_connection() as conn:

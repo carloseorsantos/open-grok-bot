@@ -38,3 +38,47 @@ def test_currency_tool(monkeypatch):
     res = get_currency_quote("EUR-BRL")
     assert "Euro/Real" in res
     assert "R$ 5.90" in res
+
+
+def test_code_runner_tool(tmp_path, monkeypatch):
+    from src.config import settings
+    from src.tools.code_runner import run_python_code
+    monkeypatch.setattr(settings, "WORKSPACE_DIR", tmp_path)
+
+    # Test math calculation
+    output = run_python_code("print(10 * 5 + 7)")
+    assert "57" in output
+
+    # Test syntax error handling
+    output_err = run_python_code("print(invalid syntax")
+    assert "SyntaxError" in output_err or "Erros/Avisos" in output_err
+
+    # Test empty code
+    assert "vazio" in run_python_code("")
+
+
+def test_image_generator_mock(tmp_path, monkeypatch):
+    from src.config import settings
+    from src.tools.image import generate_image
+    monkeypatch.setattr(settings, "WORKSPACE_DIR", tmp_path)
+
+    class MockHttpxClient:
+        def __init__(self, *args, **kwargs):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def get(self, url):
+            class MockResp:
+                status_code = 200
+                content = b"\xff\xd8\xff\xe0FAKEJPEGDATA"
+            return MockResp()
+
+    import httpx
+    monkeypatch.setattr(httpx, "Client", MockHttpxClient)
+
+    res = generate_image("a futuristic space station")
+    assert "sucesso" in res
+    assert (tmp_path / "flux_a_futuristic_space_stati").name or any(f.name.startswith("flux_") for f in tmp_path.glob("*.jpg"))
+

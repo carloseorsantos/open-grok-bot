@@ -8,14 +8,16 @@ O **Open Grok Bot** transforma modelos de inteligência artificial em uma equipe
 
 ## 🌟 Funcionalidades Inspiradas no Grok Bot Oficial
 
-* 🌐 **Computer Use / Navegador Autônomo**: Os bots controlam um navegador real (Playwright), acessam páginas, preenchem dados, navegam por sistemas e tiram printscreens.
-* 🤝 **Connect the Bots (Multi-Agente)**: Um coordenador (**Chief of Staff**) delega trabalho entre agentes especialistas (**Researcher**, **Web Navigator**, **Sales Outbound**).
-* 🧠 **Memória Compartilhada**: Todos os bots compartilham o mesmo banco de memória (SQLite) para guardar preferências de clientes, regras e contextos de projetos.
-* ⚡ **Rotinas de Automação (*Show a Bot how it's done*)**: Salve tarefas recorrentes (ex: resumo diário de notícias, auditoria de sites) para os bots executarem sob demanda.
+* 🎨 **Geração de Imagens com Flux.1**: O mesmo modelo de imagem do Grok oficial, 100% gratuito e em alta definição (1024x1024) integrado ao chat e comandos.
+* 🐍 **Code & Data Analyst**: Execução de scripts Python em sandbox para cálculos avançados, matemática e processamento de dados.
+* 🌐 **Computer Use / Navegador Autônomo**: Os bots controlam um navegador real (Playwright), acessam páginas, preenchem formulários, navegam por sistemas e tiram screenshots.
+* 🤝 **Connect the Bots (Multi-Agente)**: Um coordenador (**Chief of Staff**) orquestra especialistas (**Researcher**, **Web Navigator**, **Sales Outbound**, **Code & Data Analyst**).
+* 🧠 **Memória Compartilhada & Multi-Turn**: Contexto contínuo entre sessões, lembrando regras, preferências e aprendizados passados.
+* ⚡ **Rotinas de Automação (*Show a Bot how it's done*)**: Ensine o bot uma vez conversando ou salve rotinas estruturadas para rodar sob demanda.
 * 📱 **Controle pelo Celular e Desktop**:
-  * **CLI Interativo**: Interface no terminal do computador.
-  * **Bot do Telegram**: Delegue tarefas do celular (iOS / Android), receba printscreens e relatórios onde estiver.
-* 💸 **100% Gratuito**: Sem pagar os $20 a $40/mês do Grok oficial. Usa **Groq Cloud (Llama 3.3 70B)** gratuito ou **Ollama** local.
+  * **CLI Interativo**: Interface completa com Rich no terminal.
+  * **Bot do Telegram**: Controle remoto com upload de arquivos, recebimento de imagens Flux.1 e capturas de tela.
+* 💸 **100% Gratuito**: Sem pagar os $20 a $40/mês do Grok oficial. Usa **Groq Cloud (Llama 3.3 70B & GPT-OSS)** gratuito ou **Ollama** local com fallback resiliente.
 
 ---
 
@@ -97,20 +99,28 @@ Inicie a interface interativa:
 python run.py --cli
 ```
 
-Comandos úteis dentro do CLI:
+Comandos úteis no CLI:
 * `/help` — Exibe a lista de comandos
+* `/imagine <prompt>` — Gera uma imagem com Flux.1 e salva no workspace
+* `/code <python_code>` — Executa código Python diretamente
 * `/routines` — Lista as rotinas automatizadas disponíveis
-* `/run <nome_da_rotina>` — Executa uma rotina salva
+* `/run <nome>` — Executa uma rotina salva
+* `/delroutine <nome>` — Remove uma rotina
 * `/memory` — Visualiza memórias e regras compartilhadas
 * `/files` — Lista arquivos gerados no workspace
 * `/screenshot <url>` — Abre um site e salva um print na pasta `screenshots/`
+* `/reset` ou `/clear` — Limpa o histórico da sessão atual
 
-### Modo Telegram (Controle Remoto)
+### Modo Telegram (Controle Remoto no Celular)
 Inicie o bot do Telegram:
 ```bash
 python run.py --telegram
 ```
-No Telegram, abra a conversa com seu bot e mande `/start` ou qualquer instrução de trabalho.
+No Telegram, abra a conversa com seu bot (ex: `@Caducodesgrokbot`) e utilize:
+* `/imagine <prompt>` — Cria e envia a imagem gerada com Flux.1 na hora
+* `/routines` e `/run <nome>` — Gerencia e roda rotinas
+* Envio de Documentos — Envie arquivos `.txt`, `.csv`, `.json`, `.py` ou `.md` para análise imediata
+* Conversação Natural — Faça perguntas, solicite cotações, pesquisas na web ou navegação pelo navegador.
 
 ---
 
