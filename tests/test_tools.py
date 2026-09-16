@@ -13,3 +13,28 @@ def test_filesystem_tools(tmp_path, monkeypatch):
 
     file_list = list_workspace_files()
     assert "test.txt" in file_list
+
+
+def test_currency_tool(monkeypatch):
+    from src.tools.finance import get_currency_quote
+
+    # Test error handling / mock
+    class MockResp:
+        status_code = 200
+        def json(self):
+            return {
+                "EURBRL": {
+                    "name": "Euro/Real",
+                    "bid": "5.90",
+                    "ask": "5.91",
+                    "high": "5.95",
+                    "low": "5.88",
+                    "pctChange": "0.1"
+                }
+            }
+
+    import httpx
+    monkeypatch.setattr(httpx, "get", lambda *args, **kwargs: MockResp())
+    res = get_currency_quote("EUR-BRL")
+    assert "Euro/Real" in res
+    assert "R$ 5.90" in res

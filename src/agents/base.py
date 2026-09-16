@@ -37,9 +37,9 @@ class Agent:
         except Exception as e:
             return f"Erro ao executar ferramenta '{tool_name}': {str(e)}"
 
-    def run(self, task: str, session_id: str = "default", max_steps: int = 6) -> str:
+    def run(self, task: str, session_id: str = "default", max_steps: int = 2) -> str:
         """
-        Executa o loop autônomo de raciocínio e ação (ReAct).
+        Executa o loop autônomo de raciocínio e ação com garantia de conclusão rápida.
         """
         messages = [
             {"role": "system", "content": self.system_prompt},
@@ -51,9 +51,12 @@ class Agent:
 
         while step < max_steps:
             step += 1
+            # Na última iteração do loop, não passamos tools para forçar o modelo a sintetizar a resposta
+            allow_tools = (step < max_steps) and bool(self.tools_schema)
+
             response = llm_client.chat_completion(
                 messages=messages,
-                tools=self.tools_schema if self.tools_schema else None
+                tools=self.tools_schema if allow_tools else None
             )
 
             content = response.get("content", "")
@@ -64,13 +67,11 @@ class Agent:
                 final_response = content
                 break
 
-            # Constrói mensagem do assistente compatível com a Groq (sem campos como 'annotations')
+            # Constrói mensagem do assistente compatível com a Groq
             clean_assistant = {
                 "role": "assistant",
-                "content": content or None
-            }
-            if tool_calls:
-                clean_assistant["tool_calls"] = [
+                "content": content or None,
+                "tool_calls": [
                     {
                         "id": tc["id"],
                         "type": "function",
@@ -81,6 +82,7 @@ class Agent:
                     }
                     for tc in tool_calls
                 ]
+            }
             messages.append(clean_assistant)
 
             # Executa as ferramentas e envia as respostas com role="tool"
@@ -96,14 +98,20 @@ class Agent:
                     "content": str(tool_output)
                 })
 
-            # Adiciona diretiva de consolidação para evitar loops infinitos de busca
+            # Adiciona diretiva para consolidar a resposta sem loops
             messages.append({
                 "role": "user",
-                "content": "Com base nas informações coletadas acima, formule a resposta final completa, clara e direta para o usuário."
+                "content": (
+                    "Com base nas informações coletadas acima pelas ferramentas, elabore a resposta final completa, clara e direta para o usuário agora.\n"
+                    "REGRA DE FORMATAÇÃO: NUNCA use tabelas com barras (|). "
+                    "Formate a resposta em tópicos, cartões e bullet points (•) usando negrito e emojis, perfeitamente legível no celular."
+                )
             })
 
         if not final_response:
-            final_response = "A tarefa atingiu o limite de passos antes de finalizar completamente."
+            # Fallback garantido: força geração direta de texto sem tools
+            fallback_resp = llm_client.chat_completion(messages=messages, tools=None)
+            final_response = fallback_resp.get("content") or "Aqui estão as informações obtidas pelas ferramentas."
 
         # Salvar histórico no banco
         memory_store.add_message(session_id=session_id, role="assistant", content=final_response, agent_name=self.name)

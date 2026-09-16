@@ -4,14 +4,18 @@ from src.agents.specialists import (
     create_web_navigator_bot,
     create_outbound_bot
 )
+from src.tools.finance import get_currency_quote
+from src.tools.search import search_web, search_news
+from src.tools.browser import browser_controller
+from src.tools.filesystem import write_file, read_file
 from src.memory.db import memory_store
 
 
 class ChiefOfStaff:
     """
     Agente Coordenador (Chief of Staff).
-    Gerencia o time de bots, distribui subtarefas, coordena a memória compartilhada
-    e garante que o projeto seja entregue finalizado.
+    Lidera a equipe de AI Teammates, responde de forma rápida e proativa,
+    utiliza ferramentas diretamente para respostas ágeis e delega projetos complexos.
     """
     def __init__(self):
         self.researcher = create_researcher_bot()
@@ -19,54 +23,84 @@ class ChiefOfStaff:
         self.outbound = create_outbound_bot()
 
         self.tools = {
-            "delegate_to_researcher": self._ask_researcher,
-            "delegate_to_web_navigator": self._ask_web_navigator,
-            "delegate_to_outbound": self._ask_outbound,
+            "get_currency_quote": get_currency_quote,
+            "search_web": search_web,
+            "search_news": search_news,
+            "browser_navigate": browser_controller.navigate,
+            "browser_screenshot": browser_controller.take_screenshot,
             "save_memory": self._save_memory,
             "get_memory": self._get_memory,
             "list_memories": self._list_memories,
+            "delegate_to_outbound": self._ask_outbound,
         }
 
         self.tools_schema = [
             {
                 "type": "function",
                 "function": {
-                    "name": "delegate_to_researcher",
-                    "description": "Delega uma tarefa de pesquisa factual na web ou busca de notícias ao Researcher Bot.",
+                    "name": "get_currency_quote",
+                    "description": "Obtém cotações atualizadas em tempo real de moedas e criptos (EUR-BRL, USD-BRL, BTC-BRL).",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "task": {"type": "string", "description": "Descrição detalhada da pesquisa necessária"}
+                            "currency_pair": {"type": "string", "description": "Par de moedas (ex: 'EUR-BRL', 'USD-BRL')"}
                         },
-                        "required": ["task"]
+                        "required": ["currency_pair"]
                     }
                 }
             },
             {
                 "type": "function",
                 "function": {
-                    "name": "delegate_to_web_navigator",
-                    "description": "Delega uma tarefa de navegação em sites, cliques, formulários ou capturas de tela ao Web Navigator Bot.",
+                    "name": "search_web",
+                    "description": "Pesquisa na web em tempo real sobre qualquer assunto, fatos ou informações recentes.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "task": {"type": "string", "description": "Ações que o navegador deve executar"}
+                            "query": {"type": "string", "description": "Termo de busca"}
                         },
-                        "required": ["task"]
+                        "required": ["query"]
                     }
                 }
             },
             {
                 "type": "function",
                 "function": {
-                    "name": "delegate_to_outbound",
-                    "description": "Delega uma tarefa de prospecção comercial, qualificação de leads ou redação de email/LinkedIn.",
+                    "name": "search_news",
+                    "description": "Pesquisa notícias recentes na web.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "task": {"type": "string", "description": "Instruções para o especialista de outbound"}
+                            "query": {"type": "string", "description": "Assunto da notícia"}
                         },
-                        "required": ["task"]
+                        "required": ["query"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "browser_navigate",
+                    "description": "Abre o navegador e acessa uma URL.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string", "description": "URL para navegar"}
+                        },
+                        "required": ["url"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "browser_screenshot",
+                    "description": "Tira uma captura de tela da página atual no navegador.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string", "description": "Nome do arquivo (ex: print.png)"}
+                        }
                     }
                 }
             },
@@ -74,13 +108,13 @@ class ChiefOfStaff:
                 "type": "function",
                 "function": {
                     "name": "save_memory",
-                    "description": "Salva uma informação importante na memória de longo prazo compartilhada entre todos os bots.",
+                    "description": "Salva uma informação importante na memória compartilhada.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "category": {"type": "string", "description": "Categoria (ex: 'cliente', 'regra', 'preferencia')"},
-                            "key": {"type": "string", "description": "Chave identificadora"},
-                            "value": {"type": "string", "description": "Conteúdo ou regra a ser lembrada"}
+                            "category": {"type": "string", "description": "Categoria"},
+                            "key": {"type": "string", "description": "Chave"},
+                            "value": {"type": "string", "description": "Valor"}
                         },
                         "required": ["category", "key", "value"]
                     }
@@ -94,7 +128,7 @@ class ChiefOfStaff:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "category": {"type": "string", "description": "Categoria da memória"},
+                            "category": {"type": "string", "description": "Categoria"},
                             "key": {"type": "string", "description": "Chave"}
                         },
                         "required": ["category", "key"]
@@ -104,9 +138,15 @@ class ChiefOfStaff:
             {
                 "type": "function",
                 "function": {
-                    "name": "list_memories",
-                    "description": "Lista as memórias e regras salvas anteriormente.",
-                    "parameters": {"type": "object", "properties": {}}
+                    "name": "delegate_to_outbound",
+                    "description": "Delega uma tarefa complexa de prospecção comercial ou copywriting ao Outbound Bot.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "task": {"type": "string", "description": "Descrição da tarefa de outbound"}
+                        },
+                        "required": ["task"]
+                    }
                 }
             }
         ]
@@ -115,18 +155,17 @@ class ChiefOfStaff:
             name="Chief of Staff",
             role="Líder e Orquestrador de AI Teammates",
             system_prompt=(
-                "Você é o Chief of Staff do Open Grok Bot. Você lidera uma equipe de AI Teammates que trabalham em paralelo. "
-                "Seu estilo é direto, altamente competente, espirituoso e proativo (estilo Grok).\n\n"
+                "Você é o Chief of Staff do Open Grok Bot. Você lidera uma equipe de AI Teammates de alta performance. "
+                "Seu estilo é ágil, direto, espirituoso e altamente competente (estilo Grok).\n\n"
                 "COMO VOCÊ TRABALHA:\n"
-                "1. Analise o pedido do usuário.\n"
-                "2. Delegue para os bots especialistas adequados (Researcher para buscas/notícias, Web Navigator para sites/telas, Outbound para prospecção).\n"
-                "3. Use a memória compartilhada para lembrar preferências e fatos importantes.\n"
-                "4. Entregue o resultado final pronto, claro e muito bem formatado.\n\n"
-                "DIRETRIZES DE FORMATAÇÃO VISUAL (EXTREMAMENTE IMPORTANTE):\n"
-                "- NUNCA, SOB NENHUMA HIPÓTESE, CRIE TABELAS COM BARRAS (| ... | ... |). Em celulares e no Telegram, tabelas quebram totalmente as linhas e ficam completamente ilegíveis e feias!\n"
+                "1. Seja ultrarrápido: se o usuário perguntar cotações, use get_currency_quote imediatamente.\n"
+                "2. Se o usuário perguntar fatos ou notícias recentes, use search_web ou search_news.\n"
+                "3. Responda diretamente ao usuário assim que receber os dados da ferramenta. Não faça buscas repetidas.\n\n"
+                "REGRAS DE FORMATAÇÃO VISUAL (OBRIGATÓRIO PARA TELAS DE CELULAR/TELEGRAM):\n"
+                "- NUNCA, SOB NENHUMA HIPÓTESE, CRIE TABELAS COM BARRAS (| ... | ... |). Em celulares e no Telegram, tabelas quebram e ficam ilegíveis!\n"
                 "- Sempre formate dados, comparações, listas e preços em CARTÕES ou TÓPICOS usando negrito, bullet points (•) e quebras de linha limpas.\n"
-                "- Use emojis temáticos como marcadores visuais (ex: 📍 para locais, 💰 para preços/aluguel, ✅ para prós, ⚠️ para contras, 🚇 para transporte, ℹ️ para detalhes).\n"
-                "- Mantenha a leitura leve, escaneável e esteticamente agradável no chat do celular."
+                "- Use emojis temáticos como marcadores visuais (ex: 📍 para locais, 💰 para preços/aluguel, 📈 para alta, 📉 para baixa, ✅ para prós, ⚠️ para contras).\n"
+                "- Mantenha a leitura visualmente limpa, leve e moderna."
             ),
             tools=self.tools,
             tools_schema=self.tools_schema
