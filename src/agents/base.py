@@ -67,15 +67,26 @@ class Agent:
         messages.append({"role": "user", "content": task})
         memory_store.add_message(session_id=session_id, role="user", content=task)
 
+        # Se for apenas uma saudação simples e direta, dispensa o schema de tools (poupa ~1.240 tokens)
+        clean_task = task.strip().lower().rstrip("!.?,")
+        simple_greetings = {"oi", "ola", "olá", "e aí", "e ai", "bom dia", "boa tarde", "boa noite", "hello", "hi", "hey"}
+        is_greeting = clean_task in simple_greetings and len(clean_task.split()) <= 3
+
         step = 0
         final_response = ""
 
         while step < max_steps:
             step += 1
 
+            # No passo 1, passa tools_schema se não for saudação simples.
+            # Nos passos posteriores (síntese pós-ferramentas), passa tools=None para economizar ~1.240 tokens.
+            current_tools = None
+            if step == 1 and not is_greeting and self.tools_schema:
+                current_tools = self.tools_schema
+
             response = llm_client.chat_completion(
                 messages=messages,
-                tools=self.tools_schema if self.tools_schema else None
+                tools=current_tools
             )
 
             content = response.get("content", "")
@@ -128,8 +139,8 @@ class Agent:
             })
 
         if not final_response:
-            # Fallback seguro caso o loop tenha atingido max_steps
-            fallback_resp = llm_client.chat_completion(messages=messages, tools=self.tools_schema if self.tools_schema else None)
+            # Fallback seguro caso o loop tenha atingido max_steps (sem re-enviar schema para poupar tokens)
+            fallback_resp = llm_client.chat_completion(messages=messages, tools=None)
             final_response = fallback_resp.get("content") or "Aqui estão as informações obtidas pelas ferramentas."
 
         # Salvar histórico no banco

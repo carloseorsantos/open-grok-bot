@@ -9,14 +9,16 @@ O **Open Grok Bot** transforma modelos de inteligência artificial em uma equipe
 ## 🌟 Funcionalidades Inspiradas no Grok Bot Oficial
 
 * 🎨 **Geração de Imagens com Flux.1**: O mesmo modelo de imagem do Grok oficial, 100% gratuito e em alta definição (1024x1024) integrado ao chat e comandos.
+* 🎙️ **Transcrição de Voz com Groq Whisper**: Envie áudios e mensagens de voz pelo Telegram — o bot transcreve em ~500ms com `whisper-large-v3-turbo` e processa a tarefa direto.
+* ⚡ **Gestão Proativa de Rate Limit**: Monitoramento de headers `x-ratelimit-*`, backoff com jitter e rotação de múltiplas chaves Groq para nunca bater no erro 429 (TPM).
 * 🐍 **Code & Data Analyst**: Execução de scripts Python em sandbox para cálculos avançados, matemática e processamento de dados.
 * 🌐 **Computer Use / Navegador Autônomo**: Os bots controlam um navegador real (Playwright), acessam páginas, preenchem formulários, navegam por sistemas e tiram screenshots.
 * 🤝 **Connect the Bots (Multi-Agente)**: Um coordenador (**Chief of Staff**) orquestra especialistas (**Researcher**, **Web Navigator**, **Sales Outbound**, **Code & Data Analyst**).
 * 🧠 **Memória Compartilhada & Multi-Turn**: Contexto contínuo entre sessões, lembrando regras, preferências e aprendizados passados.
-* ⚡ **Rotinas de Automação (*Show a Bot how it's done*)**: Ensine o bot uma vez conversando ou salve rotinas estruturadas para rodar sob demanda.
+* ⚡ **Rotinas de Automação (*Show a Bot how it's done*)**: Ensine o bot uma vez conversando ou salve rotinas estruturadas para rodar sob demanda com 1 clique.
 * 📱 **Controle pelo Celular e Desktop**:
   * **CLI Interativo**: Interface completa com Rich no terminal.
-  * **Bot do Telegram**: Controle remoto com upload de arquivos, recebimento de imagens Flux.1 e capturas de tela.
+  * **Bot do Telegram**: Menu nativo de comandos, botões interativos (Inline Keyboards), feedback de digitação contínuo (`typing` heartbeat), anti-table formatting em cartões e suporte a voz.
 * 💸 **100% Gratuito**: Sem pagar os $20 a $40/mês do Grok oficial. Usa **Groq Cloud (Llama 3.3 70B & GPT-OSS)** gratuito ou **Ollama** local com fallback resiliente.
 
 ---

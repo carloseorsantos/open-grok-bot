@@ -11,6 +11,7 @@ from src.tools.browser import browser_controller
 from src.tools.filesystem import write_file, read_file
 from src.tools.image import generate_image
 from src.tools.code_runner import run_python_code
+from src.tools.audio import transcribe_audio
 from src.memory.db import memory_store
 
 
@@ -42,6 +43,7 @@ class ChiefOfStaff:
             "list_routines": self._list_routines,
             "delegate_to_outbound": self._ask_outbound,
             "delegate_to_code_analyst": self._ask_code_analyst,
+            "transcribe_audio": transcribe_audio,
         }
 
         self.tools_schema = [
@@ -245,6 +247,20 @@ class ChiefOfStaff:
                             "task": {"type": "string", "description": "Descrição detalhada da tarefa"}
                         },
                         "required": ["task"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "transcribe_audio",
+                    "description": "Transcreve um arquivo de áudio (.ogg, .mp3, .m4a, .wav) do workspace para texto usando Groq Whisper Turbo.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "file_path": {"type": "string", "description": "Caminho do arquivo de áudio"}
+                        },
+                        "required": ["file_path"]
                     }
                 }
             }
