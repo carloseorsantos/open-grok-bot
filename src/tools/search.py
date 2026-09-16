@@ -1,6 +1,7 @@
-import json
-from typing import Optional
-from duckduckgo_search import DDGS
+try:
+    from ddgs import DDGS
+except ImportError:
+    from duckduckgo_search import DDGS
 
 
 def search_web(query: str, max_results: int = 5) -> str:

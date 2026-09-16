@@ -64,12 +64,24 @@ class Agent:
                 final_response = content
                 break
 
-            # Adiciona a resposta do assistente (com tool_calls) ao histórico
-            raw_msg = response.get("raw_message")
-            if raw_msg:
-                messages.append(raw_msg.model_dump() if hasattr(raw_msg, "model_dump") else raw_msg)
-            else:
-                messages.append({"role": "assistant", "content": content})
+            # Constrói mensagem do assistente compatível com a Groq (sem campos como 'annotations')
+            clean_assistant = {
+                "role": "assistant",
+                "content": content or None
+            }
+            if tool_calls:
+                clean_assistant["tool_calls"] = [
+                    {
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tc["name"],
+                            "arguments": json.dumps(tc["arguments"]) if isinstance(tc["arguments"], dict) else str(tc["arguments"])
+                        }
+                    }
+                    for tc in tool_calls
+                ]
+            messages.append(clean_assistant)
 
             # Executa as ferramentas e envia as respostas com role="tool"
             for tc in tool_calls:
@@ -83,6 +95,12 @@ class Agent:
                     "tool_call_id": tc["id"],
                     "content": str(tool_output)
                 })
+
+            # Adiciona diretiva de consolidação para evitar loops infinitos de busca
+            messages.append({
+                "role": "user",
+                "content": "Com base nas informações coletadas acima, formule a resposta final completa, clara e direta para o usuário."
+            })
 
         if not final_response:
             final_response = "A tarefa atingiu o limite de passos antes de finalizar completamente."
