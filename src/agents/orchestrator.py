@@ -148,6 +148,14 @@ class ChiefOfStaff:
             {
                 "type": "function",
                 "function": {
+                    "name": "list_memories",
+                    "description": "Lista as principais memórias e regras compartilhadas entre os bots.",
+                    "parameters": {"type": "object", "properties": {}}
+                }
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "delegate_to_outbound",
                     "description": "Delega uma tarefa complexa de prospecção comercial ou copywriting ao Outbound Bot.",
                     "parameters": {
