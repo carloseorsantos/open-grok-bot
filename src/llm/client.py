@@ -100,7 +100,8 @@ class LLMClient:
 
             return {
                 "content": message.content or "",
-                "tool_calls": parsed_tool_calls if parsed_tool_calls else None
+                "tool_calls": parsed_tool_calls if parsed_tool_calls else None,
+                "raw_message": message
             }
         except Exception as e:
             return {

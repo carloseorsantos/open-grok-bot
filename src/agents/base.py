@@ -64,26 +64,25 @@ class Agent:
                 final_response = content
                 break
 
-            # Processa as chamadas de ferramentas
-            tool_responses = []
+            # Adiciona a resposta do assistente (com tool_calls) ao histórico
+            raw_msg = response.get("raw_message")
+            if raw_msg:
+                messages.append(raw_msg.model_dump() if hasattr(raw_msg, "model_dump") else raw_msg)
+            else:
+                messages.append({"role": "assistant", "content": content})
+
+            # Executa as ferramentas e envia as respostas com role="tool"
             for tc in tool_calls:
                 t_name = tc["name"]
                 t_args = tc["arguments"]
                 logger.info(f"[{self.name}] Executando ferramenta: {t_name} com args: {t_args}")
                 
                 tool_output = self.execute_tool(t_name, t_args)
-                tool_responses.append({
-                    "name": t_name,
-                    "output": tool_output
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": str(tool_output)
                 })
-
-            # Monta o contexto para a próxima iteração
-            step_summary = f"Ações realizadas:\n"
-            for tr in tool_responses:
-                step_summary += f"- Ferramenta `{tr['name']}` retornou:\n{tr['output']}\n"
-            
-            messages.append({"role": "assistant", "content": content or "Executando ferramentas..."})
-            messages.append({"role": "user", "content": step_summary + "\nCom base nesses dados, continue a tarefa ou forneça a resposta final."})
 
         if not final_response:
             final_response = "A tarefa atingiu o limite de passos antes de finalizar completamente."

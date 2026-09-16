@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pathlib import Path
 from telegram import Update
@@ -62,7 +63,7 @@ async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     routine_name = context.args[0]
     await update.message.reply_text(f"⏳ Executando rotina '{routine_name}'...")
-    result = routine_manager.run_routine(routine_name)
+    result = await asyncio.to_thread(routine_manager.run_routine, routine_name)
     await update.message.reply_text(result[:4000])
 
 
@@ -97,7 +98,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("⏳ Chief of Staff coordenando os bots...")
     session_id = f"telegram_{user_id}"
-    response = chief_of_staff.run(text, session_id=session_id)
+    response = await asyncio.to_thread(chief_of_staff.run, text, session_id)
 
     # Verificar se foi gerada alguma captura recente para enviar
     recent_shots = list(settings.SCREENSHOTS_DIR.glob("*.png"))
